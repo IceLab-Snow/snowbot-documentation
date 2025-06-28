@@ -1,36 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Moon, Sun, Star, Package, User, Map, Shield, Code2 } from 'lucide-react';
+import { Search, Moon, Sun, Package, User, Map, Shield, Code2, Globe, Wrench, ShoppingCart, MessageSquare, Hammer, Bird } from 'lucide-react';
 import apiService from './services/apiService';
-import { ApiData, FunctionData, UserPreferences } from './types';
-
-// Données initiales de démonstration
-const demoData: ApiData = {
-  character: {
-    name: 'Character',
-    icon: 'User',
-    color: 'from-blue-500 to-cyan-500',
-    functions: [
-      { name: 'character:name()', returns: 'String', description: 'Retourne le nom du personnage', tags: ['info'] },
-      { name: 'character:level()', returns: 'Integer', description: 'Retourne le niveau', tags: ['info'] },
-      { name: 'character:kamas()', returns: 'Number', description: 'Retourne les kamas', tags: ['economy'] }
-    ]
-  },
-  inventory: {
-    name: 'Inventory', 
-    icon: 'Package',
-    color: 'from-green-500 to-emerald-500',
-    functions: [
-      { name: 'inventory:itemCount(id)', returns: 'Integer', description: 'Nombre d\'objets', tags: ['count'] },
-      { name: 'inventory:useItem(id)', returns: 'Boolean', description: 'Utilise un objet', tags: ['action'] }
-    ]
-  }
-};
+import { ApiData, FunctionData } from './types';
+import completeInitialData from './data/initialData';
+import FunctionCard from './components/FunctionCard';
 
 function App() {
   const [darkMode, setDarkMode] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [apiData, setApiData] = useState<ApiData>(demoData);
+  const [apiData, setApiData] = useState<ApiData>(completeInitialData);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,8 +19,16 @@ function App() {
 
   const loadData = async () => {
     try {
+      // Try to load from API
       const data = await apiService.getAllFunctions();
-      if (Object.keys(data).length > 0) {
+      if (Object.keys(data).length === 0) {
+        // If API is empty, initialize with our complete data
+        await apiService.initializeDatabase({ 
+          functions: Object.entries(completeInitialData).flatMap(([category, data]) =>
+            data.functions.map(func => ({ ...func, category }))
+          )
+        });
+      } else {
         setApiData(data);
       }
       
@@ -49,7 +36,8 @@ function App() {
       setDarkMode(prefs.darkMode);
       setFavorites(prefs.favorites);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Using local data:', error);
+      // Use local data if API fails
     } finally {
       setLoading(false);
     }
@@ -65,18 +53,22 @@ function App() {
       darkMode,
       favorites: newFavorites,
       recentlyViewed: []
-    });
+    }).catch(console.error);
   };
 
   const getFilteredFunctions = () => {
     let allFunctions: (FunctionData & { category: string })[] = [];
     
     Object.entries(apiData).forEach(([category, data]) => {
-      if (selectedCategory === 'all' || selectedCategory === category) {
+      if (selectedCategory === 'all' || selectedCategory === category || 
+          (selectedCategory === 'favorites' && data.functions.some(f => favorites.includes(f.name)))) {
         data.functions.forEach(func => {
+          if (selectedCategory === 'favorites' && !favorites.includes(func.name)) return;
+          
           if (!searchQuery || 
               func.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              func.description.toLowerCase().includes(searchQuery.toLowerCase())) {
+              func.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              func.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))) {
             allFunctions.push({ ...func, category });
           }
         });
@@ -86,133 +78,272 @@ function App() {
     return allFunctions;
   };
 
-  const iconMap: any = { User, Package, Map, Shield, Code2 };
+  const iconMap: any = { 
+    User, Package, Map, Shield, Code2, Globe, ArrowRightLeft: Package,
+    Wrench, ShoppingCart, MessageSquare, Hammer, Bird 
+  };
+
+  const totalFunctions = Object.values(apiData).reduce((acc, cat) => acc + cat.functions.length, 0);
 
   if (loading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className={`mt-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Loading Snowbot Documentation...</p>
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        backgroundColor: darkMode ? '#111827' : '#f9fafb'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            border: '4px solid #06b6d4',
+            borderTopColor: 'transparent',
+            borderRadius: '50%',
+            margin: '0 auto',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <p style={{ marginTop: '16px', color: darkMode ? '#9ca3af' : '#6b7280' }}>
+            Loading Snowbot Documentation...
+          </p>
         </div>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
+    <div style={{ minHeight: '100vh', backgroundColor: darkMode ? '#111827' : '#f9fafb' }}>
       {/* Header */}
-      <header className={`sticky top-0 z-50 ${darkMode ? 'bg-gray-900/95' : 'bg-white/95'} backdrop-blur border-b ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-              Snowbot Documentation
-            </h1>
+      <header style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+        backgroundColor: darkMode ? 'rgba(17, 24, 39, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(8px)',
+        borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`
+      }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h1 style={{
+                fontSize: '24px',
+                fontWeight: 'bold',
+                background: 'linear-gradient(to right, #06b6d4, #3b82f6)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                margin: 0
+              }}>
+                Snowbot Documentation
+              </h1>
+              <p style={{ 
+                fontSize: '14px', 
+                color: darkMode ? '#9ca3af' : '#6b7280',
+                margin: '4px 0 0 0'
+              }}>
+                {totalFunctions} functions disponibles
+              </p>
+            </div>
             <button
               onClick={() => setDarkMode(!darkMode)}
-              className={`p-2 rounded-lg ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
+              style={{
+                padding: '8px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: darkMode ? '#374151' : '#f3f4f6',
+                cursor: 'pointer'
+              }}
             >
-              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
             </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex gap-6">
-          {/* Sidebar */}
-          <div className={`w-64 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-4`}>
-            <h2 className="font-bold mb-4">Categories</h2>
-            <nav className="space-y-2">
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '32px 16px', display: 'flex', gap: '24px' }}>
+        {/* Sidebar */}
+        <div style={{
+          width: '256px',
+          backgroundColor: darkMode ? '#1f2937' : 'white',
+          borderRadius: '12px',
+          padding: '16px',
+          height: 'fit-content',
+          position: 'sticky',
+          top: '100px'
+        }}>
+          <h2 style={{ 
+            fontWeight: 'bold', 
+            marginBottom: '16px',
+            color: darkMode ? 'white' : '#111827'
+          }}>
+            Categories
+          </h2>
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              onClick={() => setSelectedCategory('all')}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: 'none',
+                background: selectedCategory === 'all' 
+                  ? 'linear-gradient(to right, #06b6d4, #3b82f6)'
+                  : 'transparent',
+                color: selectedCategory === 'all' ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <span>All Functions</span>
+              <span style={{ fontSize: '12px', opacity: 0.7 }}>{totalFunctions}</span>
+            </button>
+            
+            {favorites.length > 0 && (
               <button
-                onClick={() => setSelectedCategory('all')}
-                className={`w-full text-left px-3 py-2 rounded-lg ${
-                  selectedCategory === 'all' 
-                    ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white' 
-                    : darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-                }`}
+                onClick={() => setSelectedCategory('favorites')}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: selectedCategory === 'favorites' 
+                    ? 'linear-gradient(to right, #f59e0b, #ef4444)'
+                    : 'transparent',
+                  color: selectedCategory === 'favorites' ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
               >
-                All Functions
+                <span>⭐ Favorites</span>
+                <span style={{ fontSize: '12px', opacity: 0.7 }}>{favorites.length}</span>
               </button>
-              {Object.entries(apiData).map(([key, category]) => {
-                const Icon = iconMap[category.icon] || Code2;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setSelectedCategory(key)}
-                    className={`w-full text-left px-3 py-2 rounded-lg flex items-center space-x-2 ${
-                      selectedCategory === key
-                        ? `bg-gradient-to-r ${category.color} text-white`
-                        : darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{category.name}</span>
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Main Content */}
-          <div className="flex-1">
-            {/* Search */}
-            <div className="mb-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search functions..."
-                  className={`w-full pl-10 pr-4 py-3 rounded-xl ${
-                    darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                  } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                />
-              </div>
-            </div>
-
-            {/* Functions Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {getFilteredFunctions().map((func, index) => (
-                <div
-                  key={index}
-                  className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 shadow-lg hover:shadow-xl transition-all`}
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-lg font-mono font-semibold">{func.name}</h3>
-                    <button
-                      onClick={() => toggleFavorite(func.name)}
-                      className={`p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                    >
-                      <Star className={`w-4 h-4 ${favorites.includes(func.name) ? 'fill-yellow-500 text-yellow-500' : ''}`} />
-                    </button>
-                  </div>
-                  <div className="text-sm text-cyan-500 font-mono mb-2">{func.returns}</div>
-                  <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                    {func.description}
-                  </p>
-                  {func.tags && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {func.tags.map((tag, i) => (
-                        <span key={i} className={`text-xs px-2 py-1 rounded-full ${
-                          darkMode ? 'bg-gray-700' : 'bg-gray-100'
-                        }`}>
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {getFilteredFunctions().length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-lg">No functions found</p>
-              </div>
             )}
+            
+            <div style={{ 
+              borderTop: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, 
+              margin: '8px 0' 
+            }}></div>
+            
+            {Object.entries(apiData).map(([key, category]) => {
+              const Icon = iconMap[category.icon] || Code2;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setSelectedCategory(key)}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: selectedCategory === key
+                      ? `linear-gradient(to right, ${category.color.replace('from-', '#').replace(' to-', ', #').replace('-500', '').replace('-600', '')})`
+                      : 'transparent',
+                    color: selectedCategory === key ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Icon size={16} />
+                  <span style={{ flex: 1 }}>{category.name}</span>
+                  <span style={{ fontSize: '12px', opacity: 0.7 }}>
+                    {category.functions.length}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Main Content */}
+        <div style={{ flex: 1 }}>
+          {/* Search */}
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ position: 'relative' }}>
+              <Search 
+                size={20} 
+                style={{ 
+                  position: 'absolute', 
+                  left: '12px', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)',
+                  color: '#9ca3af'
+                }} 
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search functions..."
+                style={{
+                  width: '100%',
+                  paddingLeft: '40px',
+                  paddingRight: '16px',
+                  paddingTop: '12px',
+                  paddingBottom: '12px',
+                  borderRadius: '12px',
+                  backgroundColor: darkMode ? '#1f2937' : 'white',
+                  border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                  color: darkMode ? 'white' : '#111827',
+                  fontSize: '16px',
+                  outline: 'none'
+                }}
+              />
+            </div>
           </div>
+
+          {/* Results count */}
+          <p style={{ 
+            marginBottom: '16px', 
+            color: darkMode ? '#9ca3af' : '#6b7280',
+            fontSize: '14px'
+          }}>
+            {getFilteredFunctions().length} functions found
+            {selectedCategory !== 'all' && selectedCategory !== 'favorites' && 
+              ` in ${apiData[selectedCategory]?.name}`
+            }
+            {selectedCategory === 'favorites' && ' in favorites'}
+          </p>
+
+          {/* Functions Grid */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+            gap: '16px'
+          }}>
+            {getFilteredFunctions().map((func, index) => (
+              <FunctionCard
+                key={`${func.category}-${func.name}-${index}`}
+                func={func}
+                darkMode={darkMode}
+                isFavorite={favorites.includes(func.name)}
+                onToggleFavorite={() => toggleFavorite(func.name)}
+              />
+            ))}
+          </div>
+
+          {getFilteredFunctions().length === 0 && (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: darkMode ? '#9ca3af' : '#6b7280' }}>
+              <p style={{ fontSize: '18px' }}>No functions found</p>
+              <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                Try adjusting your search or selecting a different category
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
