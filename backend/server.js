@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 // MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/snowbot-docs';
+const MONGODB_URI = process.env.MONGO_URL || process.env.MONGODB_URI || 'mongodb://mongo:dtnzATEseqItfDDFyqPIfQmOnqNMeSOM@mongodb.railway.internal:27017';
 mongoose.connect(MONGODB_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ MongoDB error:', err));
@@ -25,7 +25,7 @@ const FunctionSchema = new mongoose.Schema({
   category: String,
   tags: [String],
   example: String,
-  isNew: { type: Boolean, default: false }
+  newFunction: { type: Boolean, default: false }
 });
 
 const Function = mongoose.model('Function', FunctionSchema);
